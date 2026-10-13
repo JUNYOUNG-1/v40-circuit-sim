@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>v40 제어부 회로 시뮬레이터 v9</title>
+<title>v40 제어부 회로 시뮬레이터 v10</title>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#16191e;--mut:#5b6470;--line:#d3d8df;--ok:#1c7a52;--bad:#c22a2a;--mid:#a86400;--acc:#1f4e9c}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
@@ -1029,7 +1029,7 @@ if(typeof gApply==='function'&&document.getElementById('g_ban').textContent)gApp
     else for(const [dir,nm3] of [['u','올림 (RPWM)'],['d','내림 (LPWM)']]){
      d=add('모터 펄스 — '+nm3);const m=await cmd('M '+dir+' 95 300',2500);const pk=Math.abs(m.peak),txt='최대 '+m.peak+' mA · 끝 '+m.end+' mA';
      if(m.trip){d('fail',txt,'2.5 A 를 넘어 끊음 — 걸렸거나 합선. 원인을 찾기 전엔 다시 돌리지 말 것');break;}
-     if(pk<35){d('fail',txt,'전류가 안 흐름 → 12 V 가 BTS7960 까지 안 옴(F1 · J4) · 퓨즈 F2/F3 · J5/J6/J7 선 · U2 듀폰 순서 · 또는 액추에이터가 이미 끝에 있음');continue;}
+     if(pk<70||(Math.abs(m.avg)<25&&Math.abs(m.end)<25)){d('fail',txt+' (잡음 수준)','모터에 전류가 안 흐름. 먼저 12 V 가 오는지: 220 V 를 켠 채 DC 전압으로 GND(J1 앞쪽 칸) 기준 ① J1 뒤쪽 칸 ② J4 1번 ③ BTS7960 B+ 를 잼. ②가 0 V 면 퓨즈 F1 이 빠졌거나 끊어짐. 셋 다 12 V 면 U2 듀폰 순서 · 퓨즈 F2/F3 · J5 · J6 · J7 선');continue;}
      const q=await question('방금 액추에이터가 어떻게 움직였나요? ('+nm3+')',['둘 다 '+(dir==='u'?'나옴':'들어감'),'둘 다 반대로 움직임','하나만 움직임','서로 반대로 움직임','안 움직임']);
      const sag=v0-m.vmin, sagTxt=sag>350?' · 구동 중 5 V 가 '+(sag/1000).toFixed(2)+' V 내려감 (전원 약함)':'';
      const signBad=(dir==='u'&&m.peak<0)||(dir==='d'&&m.peak>0);
