@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>v40 제어부 회로 시뮬레이터 v8</title>
+<title>v40 제어부 회로 시뮬레이터 v9</title>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#16191e;--mut:#5b6470;--line:#d3d8df;--ok:#1c7a52;--bad:#c22a2a;--mid:#a86400;--acc:#1f4e9c}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
@@ -106,9 +106,9 @@ input[type=number]{width:84px;padding:2px 4px}
   <label class="c"><input type="checkbox" id="pt_buz"><span>부저 (J21) 연결함</span></label>
   <label class="c"><input type="checkbox" id="pt_sw"><span>스위치 · IR (J10–J16) 연결함</span></label>
  </div>
- <div class="row"><button class="p" id="pt_run">점검 시작</button><button id="pt_live">실시간 값 보기</button><button id="pt_copy" disabled>결과 복사 (Claude 에게 붙여 넣기)</button><button id="pt_gh" disabled>GitHub 로 보내기</button><span id="pt_sum"></span></div>
- <div id="pt_lv" class="note" style="font-size:13.5px"></div><div id="pt_ask"></div><div id="pt_out" class="tw"></div>
- <p class="note">5 V 는 Nano 내부 기준으로 재서 ±5 % 쯤 오차가 있습니다. 전류는 ACS712 값이라 ±0.1 A 쯤. 모터 시험은 한 번에 0.3초 · 약한 세기 · 2.5 A 에서 끊습니다. 이 점검 기능은 가상 Nano 로만 시험했고 실물에서는 처음 돌리는 것입니다.</p></div>
+ <div class="row"><button class="p" id="pt_run">점검 시작</button><button id="pt_live">실시간 값 보기</button><button id="pt_copy" disabled>결과 복사 (Claude 에게 붙여 넣기)</button><button class="p" id="pt_send">Claude 에게 보내기 (로그인 없음)</button><button id="pt_gh" disabled>GitHub 로 보내기</button><span id="pt_sum"></span></div>
+ <div id="pt_sent" class="ok" style="font-weight:700"></div><div id="pt_lv" class="note" style="font-size:13.5px"></div><div id="pt_ask"></div><div id="pt_out" class="tw"></div>
+ <p class="note">5 V 는 Nano 내부 기준으로 재서 ±5 % 쯤 오차가 있습니다. 전류는 ACS712 값이라 ±0.1 A 쯤. 모터 시험은 한 번에 0.3초 · 약한 세기 · 2.5 A 에서 끊습니다. 'Claude 에게 보내기' 는 점검 결과와 메모를 공개 중계 서비스(ntfy.sh)를 거쳐 전달합니다 — 개인 정보는 적지 마세요.</p></div>
 <div class="pane" id="proc" hidden><div class="row"><button class="p" id="runproc">지금 넣은 고장으로 절차 2–6 단계를 돌려 보기</button><span class="note">위 '고장 넣기' 에서 고른 상태 그대로, 재검토 문서의 절차를 순서대로 계산합니다 (1–2초).</span></div><div id="procout"></div></div>
 <div class="pane" id="diag" hidden>
  <p class="note" style="margin-top:0">내일 잰 값을 아는 것만 넣으면, 각 고장을 넣고 계산한 결과와 가장 잘 맞는 순서로 보여 줍니다. 빈칸은 비교에서 빠집니다.</p>
@@ -950,7 +950,7 @@ if(typeof gApply==='function'&&document.getElementById('g_ban').textContent)gApp
   }catch(e){say('실패: '+e.message,'bad');await closePort();}busy=false;return okFlash;}
  async function monitor(){if(!port)return;await closePort();await openAt(115200);mon=true;lines=[];partial='';say('연결됨 — 시리얼 모니터 115200 (아래에 Nano 가 보내는 글이 나옵니다)','ok');}
  async function send(c){if(!port||!mon){say('먼저 Nano 를 연결하세요','bad');return;}await io.write(new TextEncoder().encode(c+'\n'));logLine('> '+c);}
- window.NX={has:()=>!!port,async flash(key){$('nx_fw').value=key;$('nx_fw').dispatchEvent(new Event('change'));if(!(await flash()))throw new Error('펌웨어 올리기 실패 — 위 실물 Nano 칸의 빨간 글씨 확인');await sleep(1800);},
+ window.NX={tail:n=>lines.slice(-n),has:()=>!!port,async flash(key){$('nx_fw').value=key;$('nx_fw').dispatchEvent(new Event('change'));if(!(await flash()))throw new Error('펌웨어 올리기 실패 — 위 실물 Nano 칸의 빨간 글씨 확인');await sleep(1800);},
   cmd(c,ms){return new Promise(async(res,rej)=>{if(!port){rej(new Error('Nano 연결 안 됨'));return;}if(!mon){try{await monitor();await sleep(1900);}catch(e){rej(e);return;}}
    const h=t=>{if(t[0]!=='=')return;done();const a=t.slice(1).trim().split(/\s+/);const o={type:a[0],raw:t};a.slice(1).forEach(x=>{const i=x.indexOf('=');if(i>0)o[x.slice(0,i)]=+x.slice(i+1);});if(o.type==='ERR')rej(new Error('Nano 가 명령을 모름 — 진단 펌웨어가 아님'));else res(o);};
    const tm=setTimeout(()=>{done();rej(new Error('Nano 응답 없음 ('+c+')'));},ms||1500);const done=()=>{clearTimeout(tm);const i=hooks.indexOf(h);if(i>=0)hooks.splice(i,1);};hooks.push(h);
@@ -1022,8 +1022,8 @@ if(typeof gApply==='function'&&document.getElementById('g_ban').textContent)gApp
    else if(!acsOk)add('모터 구동')('fail','','전류 센서가 정상이 아니라 안전하게 시험할 수 없음 — 위 ACS712 부터 해결');
    else{
     d=add('명령 없이 흐르는 전류');let i0=await cmd('I');
-    if(Math.abs(i0.ma)>180){d('fail',i0.ma+' mA','EN 을 끈 상태인데 모터 쪽에 전류가 흐름 → BTS7960 초록 단자의 선 순서(B+ · B− · M+ · M−)가 틀렸을 가능성. 12 V 를 끄고 인쇄된 글자와 대조');throw new Error('모터 시험 중단');}
-    d('ok',i0.ma+' mA','거의 0 (센서 오차 범위)');
+    if(Math.abs(i0.ma)>450){d('fail',i0.ma+' mA','EN 을 끈 상태인데 모터 쪽에 전류가 흐름 → BTS7960 초록 단자의 선 순서(B+ · B− · M+ · M−)가 틀렸을 가능성. 12 V 를 끄고 인쇄된 글자와 대조');throw new Error('모터 시험 중단');}
+    if(Math.abs(i0.ma)>120)d('warn',i0.ma+' mA','센서 영점 오차로 보임 (ACS712 는 전류가 0 이어도 ±0.2 A 쯤 어긋날 수 있음). 확인: 220 V 를 끄고 [실시간 값 보기] 의 전류가 그대로면 센서 오차 → 정상. 220 V 를 끄면 0 근처로 내려가면 실제 전류 → BTS7960 단자 선 순서 확인');else d('ok',i0.ma+' mA','거의 0 (센서 오차 범위)');
     const go=await question('모터를 0.3초씩 약하게 움직입니다. 액추에이터 주변에 손 · 물건이 없고, 끝까지 들어가 있거나 나와 있지 않습니까?',['안전함 — 진행','건너뛰기']);
     if(go!==0)add('모터 펄스')('skip','','사용자가 건너뜀');
     else for(const [dir,nm3] of [['u','올림 (RPWM)'],['d','내림 (LPWM)']]){
@@ -1047,6 +1047,7 @@ if(typeof gApply==='function'&&document.getElementById('g_ban').textContent)gApp
  $('pt_run').onclick=run;
  const report=()=>'[부품 점검 '+new Date().toLocaleString()+']\n'+R.map(r=>ICON[r.s]+' '+r.n+' | '+(r.v||'')+' | '+(r.m||'').replace(/<[^>]+>/g,'')).join('\n');
  $('pt_gh').onclick=()=>{const memo=prompt('같이 보낼 메모 (지금 상태 · 증상). 비워도 됩니다.','')||'';window.open('https://github.com/JUNYOUNG-1/v40-circuit-sim/issues/new?title='+encodeURIComponent('점검 결과 '+new Date().toLocaleString())+'&body='+encodeURIComponent(memo+'\n\n```\n'+report()+'\n```'),'_blank');};
+ $('pt_send').onclick=async()=>{const memo=prompt('같이 보낼 메모 (지금 상태 · 증상 · 궁금한 것). 비워도 됩니다.','');if(memo===null)return;const tail=(window.NX&&NX.tail)?NX.tail(25).join(String.fromCharCode(10)):'';const body=(memo?'메모: '+memo+String.fromCharCode(10):'')+(R.length?report():'(점검 결과 없음)')+String.fromCharCode(10)+'--- 시리얼 마지막 줄 ---'+String.fromCharCode(10)+tail;$('pt_send').disabled=true;try{const r=await fetch('https://ntfy.sh/',{method:'POST',body:JSON.stringify({topic:'v40sim-761ab75d30d94098',title:'v40 점검 '+new Date().toLocaleString(),message:body.slice(0,3800)})});if(!r.ok)throw new Error('HTTP '+r.status);$('pt_sent').textContent='보냈습니다 ('+new Date().toLocaleTimeString()+'). 대화창에 "보냈어" 라고 알려 주세요.';}catch(e){$('pt_sent').textContent='보내기 실패: '+e.message+' — [결과 복사] 로 붙여 넣어 주세요.';}$('pt_send').disabled=false;};
  $('pt_copy').onclick=async()=>{const t=report();try{await navigator.clipboard.writeText(t);$('pt_copy').textContent='복사됨';}catch(e){prompt('아래를 복사하세요',t);}};
  $('pt_live').onclick=async()=>{if(live){clearInterval(live);live=null;$('pt_live').textContent='실시간 값 보기';return;}if(!NX.has()){alert('먼저 Nano 를 연결하세요.');return;}try{await ensure();}catch(e){return;}$('pt_live').textContent='실시간 멈춤';
   let busy=false;live=setInterval(async()=>{if(busy||running)return;busy=true;try{const v=await cmd('V',600),a=await cmd('A',600),p=await cmd('P',600);const ma=Math.round((a.mv-a.vcc/2)*1000/185);
