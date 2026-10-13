@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>v40 제어부 회로 시뮬레이터 v7</title>
+<title>v40 제어부 회로 시뮬레이터 v8</title>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#16191e;--mut:#5b6470;--line:#d3d8df;--ok:#1c7a52;--bad:#c22a2a;--mid:#a86400;--acc:#1f4e9c}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
@@ -106,7 +106,7 @@ input[type=number]{width:84px;padding:2px 4px}
   <label class="c"><input type="checkbox" id="pt_buz"><span>부저 (J21) 연결함</span></label>
   <label class="c"><input type="checkbox" id="pt_sw"><span>스위치 · IR (J10–J16) 연결함</span></label>
  </div>
- <div class="row"><button class="p" id="pt_run">점검 시작</button><button id="pt_live">실시간 값 보기</button><button id="pt_copy" disabled>결과 복사 (Claude 에게 붙여 넣기)</button><span id="pt_sum"></span></div>
+ <div class="row"><button class="p" id="pt_run">점검 시작</button><button id="pt_live">실시간 값 보기</button><button id="pt_copy" disabled>결과 복사 (Claude 에게 붙여 넣기)</button><button id="pt_gh" disabled>GitHub 로 보내기</button><span id="pt_sum"></span></div>
  <div id="pt_lv" class="note" style="font-size:13.5px"></div><div id="pt_ask"></div><div id="pt_out" class="tw"></div>
  <p class="note">5 V 는 Nano 내부 기준으로 재서 ±5 % 쯤 오차가 있습니다. 전류는 ACS712 값이라 ±0.1 A 쯤. 모터 시험은 한 번에 0.3초 · 약한 세기 · 2.5 A 에서 끊습니다. 이 점검 기능은 가상 Nano 로만 시험했고 실물에서는 처음 돌리는 것입니다.</p></div>
 <div class="pane" id="proc" hidden><div class="row"><button class="p" id="runproc">지금 넣은 고장으로 절차 2–6 단계를 돌려 보기</button><span class="note">위 '고장 넣기' 에서 고른 상태 그대로, 재검토 문서의 절차를 순서대로 계산합니다 (1–2초).</span></div><div id="procout"></div></div>
@@ -993,7 +993,7 @@ if(typeof gApply==='function'&&document.getElementById('g_ban').textContent)gApp
    if(v<4300)d('fail',vv,'5 V 가 낮음 — 무언가 5 V 를 끌어내리는 중. 방금 꽂은 것부터 하나씩 빼 보기');
    else if(v>5350)d('fail',vv,'5 V 가 높음 — LM2596 파란 나사로 5.0–5.1 V 로 낮춤. 그 전에 다른 점검 금지');
    else if(v>=4880)d(C.p12?'ok':'warn',vv,C.p12?'LM2596 가 5 V 를 공급 중':'12 V 를 안 켰다고 했는데 5 V 가 LM2596 수준 — 12 V 가 켜져 있는 것 같음');
-   else d(C.p12?'fail':'ok',vv,C.p12?'12 V 를 켰는데 5 V 가 USB 수준 → LM2596 에서 5 V 가 안 나옴: 퓨즈 F1 · J22 선 4가닥 · LM2596 표시창 · 출력 조정 확인':'USB 전원으로 동작 중 (정상)');
+   else d(C.p12?'warn':'ok',vv,C.p12?'USB 전원 수준 (4.4–4.8 V 는 USB 로 켰을 때의 정상값). 12 V 를 켰는데도 이 값이면 LM2596 이 5 V 를 안 내는 것 — OUT+ 선을 일부러 떼어 둔 상태라면 정상':'USB 전원으로 동작 중 (정상)');
    const v0=v; if(v>5350)throw new Error('5 V 과전압 — 중단');
    // 2. ACS712
    d=add('전류 센서 ACS712 (U3)');let a=await cmd('A');const ratio=a.mv/a.vcc,fl=(a.pu-a.mv)>350;
@@ -1043,9 +1043,11 @@ if(typeof gApply==='function'&&document.getElementById('g_ban').textContent)gApp
    await cmd('X').catch(()=>{});
   }catch(e){R.push({n:'중단',s:'fail',v:'',m:e.message});draw();try{await cmd('X');}catch(_){}}
   const f=R.filter(r=>r.s==='fail').length,w=R.filter(r=>r.s==='warn').length;
-  $('pt_sum').innerHTML=`<b class="${f?'bad':w?'mid':'ok'}">결과: 불합격 ${f} · 확인 필요 ${w} · 통과 ${R.filter(r=>r.s==='ok').length}</b>`;$('pt_copy').disabled=false;running=false;}
+  $('pt_sum').innerHTML=`<b class="${f?'bad':w?'mid':'ok'}">결과: 불합격 ${f} · 확인 필요 ${w} · 통과 ${R.filter(r=>r.s==='ok').length}</b>`;$('pt_copy').disabled=false;$('pt_gh').disabled=false;running=false;}
  $('pt_run').onclick=run;
- $('pt_copy').onclick=async()=>{const t='[부품 점검 '+new Date().toLocaleString()+']\n'+R.map(r=>ICON[r.s]+' '+r.n+' | '+(r.v||'')+' | '+(r.m||'').replace(/<[^>]+>/g,'')).join('\n');try{await navigator.clipboard.writeText(t);$('pt_copy').textContent='복사됨';}catch(e){prompt('아래를 복사하세요',t);}};
+ const report=()=>'[부품 점검 '+new Date().toLocaleString()+']\n'+R.map(r=>ICON[r.s]+' '+r.n+' | '+(r.v||'')+' | '+(r.m||'').replace(/<[^>]+>/g,'')).join('\n');
+ $('pt_gh').onclick=()=>{const memo=prompt('같이 보낼 메모 (지금 상태 · 증상). 비워도 됩니다.','')||'';window.open('https://github.com/JUNYOUNG-1/v40-circuit-sim/issues/new?title='+encodeURIComponent('점검 결과 '+new Date().toLocaleString())+'&body='+encodeURIComponent(memo+'\n\n```\n'+report()+'\n```'),'_blank');};
+ $('pt_copy').onclick=async()=>{const t=report();try{await navigator.clipboard.writeText(t);$('pt_copy').textContent='복사됨';}catch(e){prompt('아래를 복사하세요',t);}};
  $('pt_live').onclick=async()=>{if(live){clearInterval(live);live=null;$('pt_live').textContent='실시간 값 보기';return;}if(!NX.has()){alert('먼저 Nano 를 연결하세요.');return;}try{await ensure();}catch(e){return;}$('pt_live').textContent='실시간 멈춤';
   let busy=false;live=setInterval(async()=>{if(busy||running)return;busy=true;try{const v=await cmd('V',600),a=await cmd('A',600),p=await cmd('P',600);const ma=Math.round((a.mv-a.vcc/2)*1000/185);
    $('pt_lv').innerHTML=`5 V <b>${(v.mv/1000).toFixed(2)}</b> · A0 <b>${(a.mv/1000).toFixed(2)} V</b>${(a.pu-a.mv)>350?' (떠 있음)':''} → 전류 <b>${ma} mA</b> · 하한 ${p.d2?'–':'<b>눌림</b>'} · 상한 ${p.d3?'–':'<b>눌림</b>'} · 착좌 ${p.d4?'–':'<b>눌림</b>'} · 통 ${p.d8?'–':'<b>눌림</b>'} · 버튼 ${p.d9?'–':'<b>눌림</b>'} · IR ${p.d10?'–':'<b>감지</b>'}`;}catch(e){$('pt_lv').textContent='응답 없음';}busy=false;},500);};
