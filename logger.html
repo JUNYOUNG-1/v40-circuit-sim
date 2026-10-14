@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>v40 실험 로거 연결 · 점검 v1</title>
+<title>v40 실험 로거 연결 · 점검 v2</title>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#16191e;--mut:#5b6470;--line:#d3d8df;--ok:#1c7a52;--bad:#c22a2a;--mid:#a86400;--acc:#1f4e9c}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
@@ -39,7 +39,7 @@ input[type=number]{width:96px;padding:2px 4px}
 img.pic{max-width:100%;border:1px solid var(--line);border-radius:6px;display:block}
 .c1{color:#d22}.c2{color:#111}.c3{color:#1a56c4}
 </style></head><body>
-<header><h1>v40 실험 로거 — 연결 · 점검 v1</h1><span>분진(PMS7003) · 무게(로드셀 + HX711) · OLED · microSD · 버튼 — 여분 기판 + Nano 한 개. 세단기 제어기판용은 <a href="./">여기</a></span></header>
+<header><h1>v40 실험 로거 — 연결 · 점검 v2</h1><span>분진(PMS7003) · 무게(로드셀 + HX711) · OLED · microSD · 버튼 — 여분 기판 + Nano 한 개. 세단기 제어기판용은 <a href="./">여기</a></span></header>
 <div class="wrap">
 <div>
  <div class="card"><h2>지금 조립 상태</h2>
@@ -369,7 +369,7 @@ $('v_btn').onmousedown=()=>VN.press(true);$('v_btn').onmouseup=$('v_btn').onmous
 <script>'use strict';
 // ───────── 실물 부품 점검 (로거): 진단 펌웨어(selftest_logger)를 올리고 명령을 보내 부품을 하나씩 확인
 (function(){
- const out=$('pt_out'),ask=$('pt_ask');let running=false,live=null,R=[];
+ const out=$('pt_out'),ask=$('pt_ask');let running=false,live=null,R=[],NOPWR=[];
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  const ICON={ok:'✔',warn:'△',fail:'✕',skip:'–',run:'…'},CLS={ok:'ok',warn:'mid',fail:'bad',skip:'note',run:'note'};
  function draw(){out.innerHTML='<table><tr><th style="width:26px"></th><th style="width:210px">점검</th><th style="width:190px">잰 값</th><th>판단 · 할 일</th></tr>'+R.map(r=>`<tr><td class="${CLS[r.s]}" style="font-weight:700;font-size:16px">${ICON[r.s]}</td><td><b>${r.n}</b></td><td>${r.v||''}</td><td>${r.m||''}</td></tr>`).join('')+'</table>';}
@@ -379,7 +379,7 @@ $('v_btn').onmousedown=()=>VN.press(true);$('v_btn').onmouseup=$('v_btn').onmous
  const cmd=(c,t)=>NX.cmd(c,t);const num=n=>n.toLocaleString('en-US');
  async function ensure(){let id=null;try{id=await cmd('?',900);}catch(e){}
   if(!id||id.type!=='ID'||id.raw.indexOf('selftest_logger 1')<0){const done=add('진단 펌웨어 올리기');try{await NX.flash('lselftest');await sleep(400);let ok=false;for(let k=0;k<6&&!ok;k++){try{const r=await cmd('?',900);ok=r.type==='ID'&&r.raw.indexOf('selftest_logger')>=0;}catch(e){}}if(!ok)throw new Error('올린 뒤 응답 없음');done('ok','selftest_logger','올리고 검증함');}catch(e){done('fail','',e.message);throw e;}}}
- async function run(){if(running)return;if(!NX.has()){alert('먼저 오른쪽 위 [Nano 찾기] 로 실물 Nano 를 연결하세요. 실물이 없으면 [가상 Nano 쓰기] 를 체크.');return;}running=true;R=[];draw();$('pt_copy').disabled=true;$('pt_sum').innerHTML='';
+ async function run(){if(running)return;if(!NX.has()){alert('먼저 오른쪽 위 [Nano 찾기] 로 실물 Nano 를 연결하세요. 실물이 없으면 [가상 Nano 쓰기] 를 체크.');return;}running=true;R=[];NOPWR=[];draw();$('pt_copy').disabled=true;$('pt_sum').innerHTML='';
   const C={oled:$('l_oled').checked,btn:$('l_btn').checked,hx:$('l_hx').checked,cell:$('l_cell').checked,pms:$('l_pms').checked,sd:$('l_sd').checked,card:$('l_card').checked};
   try{
    await ensure();
@@ -402,11 +402,12 @@ $('v_btn').onmousedown=()=>VN.press(true);$('v_btn').onmouseup=$('v_btn').onmous
     else if(o.a3c){d('ok','주소 0x3C 응답','통신 정상');const d2=add('OLED 표시');await cmd('O 1',1500);const q=await question('OLED 화면에 <b>LOGGER TEST</b> 글자가 보이나요?',['보임','안 보임 (까만 화면)','글자가 깨져 보임']);await cmd('O 0',1500).catch(()=>{});
      d2(q===0?'ok':'fail',['보임','안 보임','깨짐'][q],q===0?'':q===1?'통신은 되는데 화면이 안 켜짐 → 모듈 불량 가능. 보호 필름 · 밝은 곳에서 다시 확인':'화면 종류가 다름 (SH1106 등) → 펌웨어의 화면 종류를 바꿔야 함. 알려 주세요');}
     else if(o.a3d)d('warn','주소 0x3D 응답','화면은 있는데 주소가 0x3D — 로거 펌웨어는 0x3C 로 보냄. 모듈 뒷면의 주소 납땜 점퍼를 0x78(0x3C) 쪽으로');
-    else d('fail','응답 없음','선은 살아 있는데 대답이 없음 → <b>SDA · SCL 이 서로 바뀜</b> (J23 3번 = SDA, 4번 = SCL) 이 가장 흔함');}
+    else{NOPWR.push('OLED');d('fail','응답 없음','선은 살아 있는데 대답이 없음 → <b>SDA · SCL 이 서로 바뀜</b> (J23 3번 = SDA, 4번 = SCL) 이 가장 흔함 · 또는 OLED 에 전원이 안 감 (VCC ↔ GND 를 멀티미터로)');}}
    else add('OLED 화면')('skip','','연결 안 함');
    // 4. HX711 · 로드셀
    if(C.hx){d=add('HX711 (무게 증폭기)');let h=await cmd('H 10',6000);
     if(!h.ready){d('fail','데이터 없음 (DT = '+(h.dt?'HIGH':'LOW')+')','HX711 이 값을 안 냄 → <b>DT · SCK 가 바뀜</b> (DT = J12 1번, SCK = U2 1번) · VCC(U2 7번) · GND(J12 2번) 확인');add('로드셀')('skip','','HX711 부터 해결');}
+    else if(h.raw===0&&h.max===0&&h.min===0){NOPWR.push('HX711');d('fail','값이 0 에 붙음 (DT 가 계속 LOW)','HX711 이 숫자를 안 냄 → ① <b>HX711 에 5 V 가 안 감</b> (VCC = U2 7번, GND = J12 2번 — U2 는 네모 자리가 1번이니 7번은 반대쪽 끝에서 두 번째) ② <b>SCK 선이 안 닿음</b> (U2 1번) ③ DT 선이 GND 에 닿음. 멀티미터 DC 전압으로 HX711 의 VCC ↔ GND 가 4.5 V 이상인지');add('로드셀')('skip','','HX711 부터 해결');}
     else{const span=h.max-h.min;d('ok','값 '+num(h.raw),'통신 정상 (10번 읽음)');const d2=add('로드셀 4선');
      if(!C.cell)d2('skip','','연결 안 함');
      else if(Math.abs(h.raw)>8300000)d2('fail','값이 끝에 붙음 ('+num(h.raw)+')','로드셀 선이 빠졌거나 순서가 틀림 → 빨강 = E+, 검정 = E−, 흰색 = A−, 초록 = A+ (HX711 인쇄 글자 기준)');
@@ -421,17 +422,18 @@ $('v_btn').onmousedown=()=>VN.press(true);$('v_btn').onmouseup=$('v_btn').onmous
    if(C.pms){d=add('분진 센서 PMS7003');ask.innerHTML='<div class="card" style="margin:8px 0">분진 센서 듣는 중… (4초)</div>';const m=await cmd('M 4000',6500);ask.innerHTML='';
     if(m.ok>=1)d(m.bad>m.ok?'warn':'ok','PM2.5 '+m.pm25+' · PM10 '+m.pm10+' µg/m³','정상 — 4초 동안 '+m.ok+'번 받음'+(m.bad?' (깨진 것 '+m.bad+'번 — 선이 길거나 헐거움)':'')+'. 실내는 보통 5–30');
     else if(m.bytes===0){const q=await question('분진 센서에서 <b>작은 팬 소리</b>(윙 소리)가 나거나 바람이 느껴지나요?',['팬이 돎','조용함']);
-     d('fail','아무것도 안 들어옴',q===0?'센서는 켜졌는데 데이터가 안 옴 → <b>TX 선이 J10 1번</b>에 꽂혔는지 (J11 은 RX 용) · G7 어댑터의 TX / RX 글자를 다시 확인 · 어댑터와 센서 사이 납작 케이블이 끝까지 꽂혔는지':'센서에 전원이 안 감 → VCC = J16 2번, GND = J16 1번 (J16 은 네모 납땜 자리가 1번) · 5 V 인지');}
+     if(q!==0)NOPWR.push('분진 센서');d('fail','아무것도 안 들어옴',q===0?'센서는 켜졌는데 데이터가 안 옴 → <b>TX 선이 J10 1번</b>에 꽂혔는지 (J11 은 RX 용) · G7 어댑터의 TX / RX 글자를 다시 확인 · 어댑터와 센서 사이 납작 케이블이 끝까지 꽂혔는지':'센서에 전원이 안 감 → VCC = J16 2번, GND = J16 1번 (J16 은 네모 납땜 자리가 1번) · 5 V 인지');}
     else d('fail',m.bytes+' 바이트 · 맞는 묶음 0','무언가 들어오지만 형식이 다름 → TX 대신 다른 핀(SET · RESET)을 꽂았거나 접촉 불량');}
    else add('분진 센서 PMS7003')('skip','','연결 안 함');
    // 6. microSD
    if(C.sd){d=add('microSD (J15 · J20)');if(!C.card)d('skip','','카드를 안 꽂았다고 표시해 건너뜀 — 기록을 남기려면 카드 필요');
     else{ask.innerHTML='<div class="card" style="margin:8px 0">microSD 시험 중… (카드가 없으면 3초쯤 걸림)</div>';const s=await cmd('S',9000);ask.innerHTML='';
-     if(!s.init)d('fail','카드를 못 읽음','순서대로 확인: ① 카드가 끝까지 꽂혔는지 ② 카드가 <b>32 GB 이하 · FAT32</b> 인지 (64 GB 이상은 exFAT 라 안 됨) ③ 기판 <b>R1 · R2 · R3 자리를 전선으로</b> 이었는지 ④ CS = J15 2번, SCK = J20 1번, MISO = J20 2번, MOSI = J20 3번 ⑤ 모듈이 5 V 형인지');
+     if(!s.init){NOPWR.push('microSD');}if(!s.init)d('fail','카드를 못 읽음','순서대로 확인: ① 카드가 끝까지 꽂혔는지 ② 카드가 <b>32 GB 이하 · FAT32</b> 인지 (64 GB 이상은 exFAT 라 안 됨) ③ 기판 <b>R1 · R2 · R3 자리를 전선으로</b> 이었는지 ④ CS = J15 2번, SCK = J20 1번, MISO = J20 2번, MOSI = J20 3번 ⑤ 모듈이 5 V 형인지');
      else if(!s.wr)d('fail','읽기는 되나 쓰기 실패','카드가 쓰기 금지이거나 가득 참 · 다른 카드로');
      else if(!s.rd)d('fail','쓴 것을 다시 못 읽음','카드 불량 또는 선 접촉 불량 (MISO)');
      else d('ok','쓰기 · 읽기 · 지우기','정상 — 시험 파일을 만들고 다시 읽은 뒤 지움');}}
    else add('microSD')('skip','','연결 안 함');
+   if(NOPWR.length>=3)add('공통 원인 의심')('fail',NOPWR.join(' · '),'여러 모듈이 한꺼번에 \'전원이 없는\' 모습 → 모듈마다 고장이 아니라 <b>기판의 5 V · GND 가 모듈까지 안 가는 것</b>일 가능성이 큼. USB 를 꽂은 채 멀티미터 DC 전압으로 ① Nano 의 5V ↔ GND 핀 ② 각 모듈의 VCC ↔ GND 핀을 잼. ①은 4.5 V 인데 ②가 0 V 면, 커넥터(J16 · J15 · J23 · U2)가 기판에 납땜됐는지 · 하우징이 끝까지 꽂혔는지 · Nano 가 소켓에 끝까지 꽂혔는지');
    await cmd('X').catch(()=>{});
    const f0=R.filter(r=>r.s==='fail').length;
    if(!f0){const q=await question('전부 통과했습니다. 바로 <b>로거 펌웨어 v1.1</b> 을 올릴까요? (올리면 기록이 시작되고 [실시간 기록] · [로드셀 보정] 을 쓸 수 있습니다)',['올리기','나중에']);
